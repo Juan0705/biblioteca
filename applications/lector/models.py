@@ -1,39 +1,34 @@
 from django.db import models
+from django.db.models.signals import post_delete
+
 from applications.libro.models import Libro
+from applications.autor.models import Persona
+
+# managers
+from .managers import PrestamoManager
+
+from .signals import update_libro_stok
 
 
 # Create your models here.
 
-class Lector(models.Model):
-    """Model definition for Lector."""
-
-    # TODO: Define fields here
-    nombre = models.CharField(max_length=50)
-    apellido = models.CharField(max_length=50)
-    nacionalidad = models.CharField(max_length=50)
-    edad = models.PositiveIntegerField(default=0)
+class Lector(Persona):
 
     class Meta:
-        """Meta definition for Lector."""
-
         verbose_name = 'Lector'
-        verbose_name_plural = 'Lectors'
+        verbose_name_plural = 'Lectores'
 
-    def __str__(self):
-        """Unicode representation of Lector."""
-        return self.nombre
 
 class Prestamo(models.Model):
-    """Model definition for Prestamo."""
-
-    # TODO: Define fields here
+    
     lector = models.ForeignKey(
         Lector,
         on_delete=models.CASCADE
     )
     libro = models.ForeignKey(
         Libro,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        related_name='libro_prestamo'
     )
     fecha_prestamo = models.DateField(auto_now=False, auto_now_add=False)
     fecha_devolucion = models.DateField(
@@ -42,15 +37,23 @@ class Prestamo(models.Model):
         auto_now=False, 
         auto_now_add=False
     )
+    devuelto = models.BooleanField()
+
+    objects = PrestamoManager()
 
     class Meta:
-        """Meta definition for Prestamo."""
 
         verbose_name = 'Prestamo'
         verbose_name_plural = 'Prestamos'
 
+    def save(self, *args, **kwargs):
+        print ('============================')
+        self.libro.stok = self.libro.stok -1
+        self.libro.save()
+
+        super(Prestamo, self).save(*args, **kwargs)
 
     def __str__(self):
-        """Unicode representation of Prestamo."""
         return self.libro.titulo
 
+post_delete.connect(update_libro_stok, sender=Prestamo)
